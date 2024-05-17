@@ -48,6 +48,7 @@ export class OASRouter extends OASBase {
         }));
       } else { // Load when annotations disabled
         const allowedMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+        const controllerDirectories = Array.isArray(config.controllers) ? config.controllers : [config.controllers];
         await Promise.all(Object.entries(oasFile.paths).flatMap(([expressPath, obj]) => {
           const controllerName = obj['x-router-controller'] ?? commons.generateName(expressPath, "controller");
 
@@ -57,17 +58,27 @@ export class OASRouter extends OASBase {
               const tmp = {};
               const opId = methodObj.operationId ?? commons.generateName(expressPath, "function");
               const opControllerName = methodObj['x-router-controller'] ?? controllerName;
-              const path = commons.filePath(config.controllers, opControllerName);
 
-              if (!path) throw new errors.RoutingError(`Controller ${opControllerName} not found`);
+              const controllerFiles = controllerDirectories.map((controllerDirectory) => {
+                return commons.filePath(controllerDirectory, opControllerName) ?? null;
+              }).filter((controllerFile) => controllerFile !== null);
+
+              if (!controllerFiles) {
+                throw new errors.RoutingError(`Controller ${opControllerName} not found`);
+              }
+
+              const resolvedMethod = controllerFiles.map(async (controllerFile) => {
+                return (await import(pathToFileURL(controllerFile)))[opId] ?? null;
+              }).find((resolvedMethod) => resolvedMethod !== null);
+
+              if (!resolvedMethod) {
+                throw new errors.RoutingError(`Method ${opId} not found`);
+              }
 
               tmp[expressPath] = {
                 ...tmp[expressPath],
-                [method.toUpperCase()]: (await import(pathToFileURL(path)))[opId]
+                [method.toUpperCase()]: await resolvedMethod
               };
-
-              if (!tmp[expressPath][method.toUpperCase()])
-                throw new Error(`Controller ${path} does not have method ${opId}`);
 
               return tmp
             });

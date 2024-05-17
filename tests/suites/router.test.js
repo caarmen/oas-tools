@@ -58,6 +58,28 @@ export default () => {
                     assert.deepStrictEqual(err.response.data, {error: "Error: Error raised in async controller"});
                 });
             });
+
+            it('Should route to controller correctly with an array of controller directories', async () => {
+                cfg.useAnnotations = false;
+                cfg.controllers = ["tests/testServer/controllers"];
+                await init(cfg);
+
+                await axios.get('http://localhost:8080/api/v1/oasRouter').then(res => {
+                    assert.equal(res.status, 200);
+                    assert.equal(res.data, 'Test service for router middleware');
+                });
+            });
+
+            it('Should route to controller correctly with an array of controller directories and is async', async () => {
+                cfg.useAnnotations = false;
+                cfg.controllers = ["tests/testServer/controllers"];
+                await init(cfg);
+
+                await axios.get('http://localhost:8080/api/v1/oasRouter/async').then(res => {
+                    assert.equal(res.status, 200);
+                    assert.equal(res.data, 'Test service for router middleware');
+                });
+            });
         });
     });
 }
